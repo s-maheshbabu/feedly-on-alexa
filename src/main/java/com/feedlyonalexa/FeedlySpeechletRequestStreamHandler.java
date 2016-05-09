@@ -12,7 +12,7 @@ public class FeedlySpeechletRequestStreamHandler extends SpeechletRequestStreamH
 
     static {
         supportedApplicationIds = new HashSet<String>();
-        // supportedApplicationIds.add("amzn1.echo-sdk-ams.app.[unique-value-here]");
+        supportedApplicationIds.add("amzn1.echo-sdk-ams.app.8795de28-1b87-4310-a366-62e0c2d0956d");
     }
 
     public FeedlySpeechletRequestStreamHandler() {
