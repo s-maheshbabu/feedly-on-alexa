@@ -208,8 +208,8 @@ public class FeedlySpeechlet implements Speechlet {
 		
 		Reprompt reprompt = new Reprompt();
 		PlainTextOutputSpeech repromptSpeech = new PlainTextOutputSpeech();
-		repromptSpeech.setText("Do you want me to add this to your saved articles? You can say things like Save, Yes, Add it et cetera." +
-		                       "If you do not want to save it, you can say things like 'No', 'Skip', 'Do not save it' et cetera.");
+		repromptSpeech.setText("Do you want me to add this to your saved articles? As I wait after each article, you can say things like Save, Yes, Add it et cetera. " +
+		                       "Otherwise, say things like 'Skip', 'No', 'Do not save it' et cetera.");
 		reprompt.setOutputSpeech(repromptSpeech);
 		
 		return SpeechletResponse.newAskResponse(outputSpeech, reprompt);
