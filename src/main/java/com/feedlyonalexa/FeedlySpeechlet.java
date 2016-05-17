@@ -3,6 +3,7 @@ package com.feedlyonalexa;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,7 +54,7 @@ public class FeedlySpeechlet implements Speechlet {
 		if("AMAZON.NoIntent".equals(intentRequest.getIntent().getName())
 				|| "SkipIntent".equals(intentRequest.getIntent().getName()))
 		{
-			return handleNoIntent(intentRequest, session);
+			return handleFeedlyIntent(session);
 		}
 		if("AMAZON.YesIntent".equals(intentRequest.getIntent().getName())
 				|| "SaveIntent".equals(intentRequest.getIntent().getName()))
@@ -98,25 +99,6 @@ public class FeedlySpeechlet implements Speechlet {
 		
 		return handleFeedlyIntent(session);
 	}
-
-	private SpeechletResponse handleNoIntent(IntentRequest intentRequest, Session session) throws SpeechletException {
-		String itemAsString = (String)session.getAttribute("itemBeingDelivered");
-		Item item;
-		try {
-			item = objectMapper.readValue(itemAsString, Item.class);
-		} catch (Exception e) {
-			throw new SpeechletException("Unable to deserialize items: " + itemAsString, e);
-		}
-		
-		MarkersRequest request = new MarkersRequest();
-		List<String> entryIds = new ArrayList<String>();
-		entryIds.add(item.getId());
-		request.setEntryIds(entryIds);
-		request.setAction(MarkersAction.markAsRead);
-		callMarkers(request);
-		
-		return handleFeedlyIntent(session);
-	}
 	
 	private void callMarkers(MarkersRequest request) throws SpeechletException
 	{
@@ -154,9 +136,9 @@ public class FeedlySpeechlet implements Speechlet {
 		
 		indexToDeliver++;
 		session.setAttribute("indexToDeliver", indexToDeliver);
-		
+
 		String ssmlText = "<speak> ";
-		ssmlText += "From " + itemToDeliver.getOrigin().getTitle() + ". " + itemToDeliver.getTitle();
+		ssmlText += "From " + StringEscapeUtils.escapeXml11(itemToDeliver.getOrigin().getTitle()) + ". " + itemToDeliver.getTitle();
 		ssmlText += ". <audio src=\"https://s3-us-west-2.amazonaws.com/gmail-on-alexa/message-end.mp3\" />";
 		ssmlText += "Save it?";
 		ssmlText += " </speak>";
@@ -199,8 +181,20 @@ public class FeedlySpeechlet implements Speechlet {
 			throw new SpeechletException("Couldn't serialize");
 		}
 		
+		MarkersRequest request = new MarkersRequest();
+		List<String> entryIds = new ArrayList<String>();
+		entryIds.add(itemToDeliver.getId());
+		request.setEntryIds(entryIds);
+		request.setAction(MarkersAction.markAsRead);
+		try {
+			callMarkers(request);
+		} catch(Exception e)
+		{
+			logger.warn("Failed to mark the item delivered as read. Not a critical failure and so swallaowing the exception.");
+		}
+
 		String ssmlText = "<speak> ";
-		ssmlText += "From " + itemToDeliver.getOrigin().getTitle() + ". " + itemToDeliver.getTitle();
+		ssmlText += "From " + StringEscapeUtils.escapeXml11(itemToDeliver.getOrigin().getTitle()) + ". " + StringEscapeUtils.escapeXml11(itemToDeliver.getTitle());
 		ssmlText += " </speak>";
 		
 		SsmlOutputSpeech outputSpeech = new SsmlOutputSpeech();
