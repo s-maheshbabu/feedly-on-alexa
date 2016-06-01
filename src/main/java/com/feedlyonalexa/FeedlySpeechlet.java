@@ -61,6 +61,10 @@ public class FeedlySpeechlet implements Speechlet {
 		{
 			return handleYesIntent(intentRequest, session);
 		}
+		if("RepeatIntent".equals(intentRequest.getIntent().getName()))
+		{
+			return handleRepeatIntent(intentRequest, session);
+		}
 		else if("FeedlyIntent".equals(intentRequest.getIntent().getName()))
 		{
 			return handleFeedlyIntent(session);
@@ -100,6 +104,31 @@ public class FeedlySpeechlet implements Speechlet {
 		return handleFeedlyIntent(session);
 	}
 	
+	private SpeechletResponse handleRepeatIntent(IntentRequest intentRequest, Session session) throws SpeechletException {
+		String itemAsString = (String)session.getAttribute("itemBeingDelivered");
+		Item itemToDeliver;
+		try {
+			itemToDeliver = objectMapper.readValue(itemAsString, Item.class);
+		} catch (Exception e) {
+			throw new SpeechletException("Unable to deserialize items: " + itemAsString, e);
+		}
+
+		String ssmlText = "<speak> ";
+		ssmlText += "From " + StringEscapeUtils.escapeXml11(itemToDeliver.getOrigin().getTitle()) + ". " + StringEscapeUtils.escapeXml11(itemToDeliver.getTitle());
+		ssmlText += " </speak>";
+
+		SsmlOutputSpeech outputSpeech = new SsmlOutputSpeech();
+		outputSpeech.setSsml(ssmlText);
+
+		Reprompt reprompt = new Reprompt();
+		PlainTextOutputSpeech repromptSpeech = new PlainTextOutputSpeech();
+		repromptSpeech.setText("Do you want me to add this to your saved articles? As I wait after each article, you can say things like Save, Yes, Add it et cetera. " +
+                     "Otherwise, say things like 'Skip', 'No', 'Do not save it' et cetera.");
+		reprompt.setOutputSpeech(repromptSpeech);
+
+		return SpeechletResponse.newAskResponse(outputSpeech, reprompt);
+	}
+
 	private void callMarkers(MarkersRequest request) throws SpeechletException
 	{
 		String serializedRequest;
@@ -190,7 +219,7 @@ public class FeedlySpeechlet implements Speechlet {
 			callMarkers(request);
 		} catch(Exception e)
 		{
-			logger.warn("Failed to mark the item delivered as read. Not a critical failure and so swallaowing the exception.");
+			logger.warn("Failed to mark the item delivered as read. Not a critical failure and so swallowing the exception.");
 		}
 
 		String ssmlText = "<speak> ";
