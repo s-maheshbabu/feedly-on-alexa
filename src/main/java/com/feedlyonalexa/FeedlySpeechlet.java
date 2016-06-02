@@ -163,40 +163,6 @@ public class FeedlySpeechlet implements Speechlet {
 		}
 	}
 
-	private SpeechletResponse deliverNextItem(Session session) throws SpeechletException
-	{
-		String itemsAsString = (String)session.getAttribute("items");
-		List<Item> items;
-		try {
-			items = objectMapper.readValue(itemsAsString, objectMapper.getTypeFactory().constructCollectionType(List.class, Item.class));
-		} catch (Exception e) {
-			throw new SpeechletException("Unable to deserialize items: " + itemsAsString, e);
-		}
-		Integer indexToDeliver = (Integer) session.getAttribute("indexToDeliver");
-
-		Item itemToDeliver = items.get(indexToDeliver);
-
-		indexToDeliver++;
-		session.setAttribute("indexToDeliver", indexToDeliver);
-
-		String ssmlText = "<speak> ";
-		ssmlText += "From " + StringEscapeUtils.escapeXml11(itemToDeliver.getOrigin().getTitle()) + ". " + itemToDeliver.getTitle();
-		ssmlText += ". <audio src=\"https://s3-us-west-2.amazonaws.com/gmail-on-alexa/message-end.mp3\" />";
-		ssmlText += "Save it?";
-		ssmlText += " </speak>";
-
-		SsmlOutputSpeech outputSpeech = new SsmlOutputSpeech();
-		outputSpeech.setSsml(ssmlText);
-		System.out.println(ssmlText);
-
-		Reprompt reprompt = new Reprompt();
-		SsmlOutputSpeech repromptSpeech = new SsmlOutputSpeech();
-		repromptSpeech.setSsml("Do you want me to add this to your saved articles?");
-		reprompt.setOutputSpeech(repromptSpeech = new SsmlOutputSpeech());
-
-		return SpeechletResponse.newAskResponse(outputSpeech, reprompt);
-	}
-
 	private SpeechletResponse handleFeedlyIntent(Session session) throws SpeechletException {
 		String continuation = (session.getAttribute("continuation") == null) ? null : (String)session.getAttribute("continuation");
 		if(!session.isNew() && StringUtils.isEmpty(continuation))
