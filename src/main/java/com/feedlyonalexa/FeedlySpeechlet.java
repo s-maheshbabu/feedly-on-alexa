@@ -154,7 +154,7 @@ public class FeedlySpeechlet implements Speechlet {
 
 		try {
 			HttpResponse<JsonNode> asJson = Unirest.post("http://cloud.feedly.com/v3/markers")
-					.header("Authorization", "OAuth Ay1PAqrASp7FqRCGfZr3k8XvK_NmwPFjwbG_Gk1BQ4mOJzjbW86o1RGPzDo0Hj55_tKBZ7Xp7eu0U-FpAZpltt46h7Ec1-VKIUzYJkRbNBuSalpjOStsgseIwmo6mCmvaj1eAIqiXOHdXfcAq7GQnzTOQxThVXIfXlI00q51li1zz_nq8B09spvIEiKieIa6uiV1zX2Nr2j7oGNRAHDxRXDaS8r0NQ:feedlydev")
+					.header("Authorization", "OAuth AxoziqwZU2mvx68PNT0ocTfbxQFEXT19D_Ydw6WGd2E5zk_QIHncf30HlA2ag03xIA6rBAfZf-rZ_u5tQxfy8PxWVwVpm1f52C4w-aNj4OcTRcMkOVjy9RsJXoyjEMT3JvbevNs4_CYDLu-YMwcBUX9pykkPrcu2Est65U7j0kNOtmgqVFoKAutrWIvaqJJRUJYYJyPLY0HJ0cojW57aZrnlzXY16Q:feedlydev")
 					.body(serializedRequest)
 					.asJson();
 			System.out.println(asJson.getStatus() + asJson.getStatusText());
