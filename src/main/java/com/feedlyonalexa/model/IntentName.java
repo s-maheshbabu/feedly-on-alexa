@@ -6,7 +6,13 @@ package com.feedlyonalexa.model;
 public enum IntentName
 {
     CANCEL_INTENT("AMAZON.CancelIntent"),
-    STOP_INTENT("AMAZON.StopIntent");
+    STOP_INTENT("AMAZON.StopIntent"),
+    YES_INTENT("AMAZON.YesIntent"),
+    NO_INTENT("AMAZON.NoIntent"),
+    FEEDLY_INTENT("FeedlyIntent"),
+    REPEAT_INTENT("RepeatIntent"),
+    SAVE_INTENT("SaveIntent"),
+    SKIP_INTENT("SkipIntent");
 
     private final String intentName;
 

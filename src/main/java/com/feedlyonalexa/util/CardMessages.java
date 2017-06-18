@@ -11,4 +11,13 @@ public class CardMessages
     {
         return "You reviewed " + numberOfArticlesReviewed + " articles and saved " + numberOfArticlesSaved;
     }
+
+    public static final String buildEndOfFeedsMessage(int numberOfArticlesSaved, int numberOfArticlesReviewed)
+    {
+        return "There are no more unread articles. You reviewed " + numberOfArticlesReviewed + " articles and saved " + numberOfArticlesSaved + ". Goodbye.";
+    }
+
+    private CardMessages()
+    {
+    }
 }

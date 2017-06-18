@@ -5,6 +5,8 @@ package com.feedlyonalexa.model;
  */
 public class SessionAttribute
 {
+    public static final String CONTINUATION = "continuation";
+    public static final String ITEM_BEING_DELIVERED = "itemBeingDelivered";
     public static final String SAVED_ARTICLES = "saved";
     public static final String REVIEWED_ARTICLES = "reviewed";
 }
