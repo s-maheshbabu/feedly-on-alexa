@@ -3,6 +3,10 @@ package com.feedlyonalexa;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.feedlyonalexa.model.IntentName;
+import com.feedlyonalexa.model.SessionAttribute;
+import com.feedlyonalexa.util.CardMessages;
+import com.feedlyonalexa.util.Prompts;
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -38,6 +42,7 @@ public class FeedlySpeechlet implements Speechlet {
 	public static void main(String[] args) throws SpeechletException {
 		FeedlySpeechlet speechlet = new FeedlySpeechlet();
 
+		/*
 		MarkersRequest request = new MarkersRequest();
 		List<String> entryIds = new ArrayList<String>();
 		entryIds.add("asdf");
@@ -49,10 +54,11 @@ public class FeedlySpeechlet implements Speechlet {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		//speechlet.onLaunch(null, Session.builder().withSessionId("id").withIsNew(true).build());
+		*/
+
+		speechlet.onLaunch(null, Session.builder().withSessionId("id").withIsNew(true).build());
 	}
 
-	@Override
 	public SpeechletResponse onIntent(IntentRequest intentRequest, Session session) throws SpeechletException {
 		if("AMAZON.NoIntent".equals(intentRequest.getIntent().getName())
 				|| "SkipIntent".equals(intentRequest.getIntent().getName()))
@@ -72,8 +78,8 @@ public class FeedlySpeechlet implements Speechlet {
 		{
 			return handleFeedlyIntent(session);
 		}
-		else if("AMAZON.StopIntent".equals(intentRequest.getIntent().getName())
-				|| "AMAZON.CancelIntent".equals(intentRequest.getIntent().getName()))
+		else if(IntentName.STOP_INTENT.toString().equals(intentRequest.getIntent().getName())
+				|| IntentName.CANCEL_INTENT.toString().equals(intentRequest.getIntent().getName()))
 		{
 			return handleStopIntent(session);
 		}
@@ -83,14 +89,14 @@ public class FeedlySpeechlet implements Speechlet {
 
 	private SpeechletResponse handleStopIntent(Session session) throws SpeechletException {
 		PlainTextOutputSpeech outputSpeech = new PlainTextOutputSpeech();
-		outputSpeech.setText("Goodbye");
+		outputSpeech.setText(Prompts.END_SESSION_PROMPT);
 
 		SimpleCard card = new SimpleCard();
-		card.setTitle("Feedly review summary");
+		card.setTitle(CardMessages.SUMMARY_TITLE);
 
-		int numberOfSavedArticles = session.getAttribute("saved") == null ? 0 : (int)session.getAttribute("saved");
-		int numberOfReviewedArticles = session.getAttribute("reviewed") == null ? 0 : (int)session.getAttribute("reviewed");
-		card.setContent("You reviewed " + numberOfReviewedArticles + " articles and saved " + numberOfSavedArticles);
+		int numberOfArticlesSaved = session.getAttribute(SessionAttribute.SAVED_ARTICLES) == null ? 0 : (Integer)session.getAttribute(SessionAttribute.SAVED_ARTICLES);
+		int numberOfArticlesReviewed = session.getAttribute(SessionAttribute.REVIEWED_ARTICLES) == null ? 0 : (Integer)session.getAttribute(SessionAttribute.REVIEWED_ARTICLES);
+		card.setContent(CardMessages.buildSummaryMessage(numberOfArticlesSaved, numberOfArticlesReviewed));
 
 		return SpeechletResponse.newTellResponse(outputSpeech, card);
 	}
@@ -111,7 +117,7 @@ public class FeedlySpeechlet implements Speechlet {
 		request.setAction(MarkersAction.markAsSaved);
 		callMarkers(request);
 
-		int numberOfSavedArticles = session.getAttribute("saved") == null ? 0 : (int)session.getAttribute("saved");
+		int numberOfSavedArticles = session.getAttribute("saved") == null ? 0 : (Integer)session.getAttribute("saved");
 		session.setAttribute("saved", ++numberOfSavedArticles);
 
 		return handleFeedlyIntent(session);
@@ -154,7 +160,7 @@ public class FeedlySpeechlet implements Speechlet {
 
 		try {
 			HttpResponse<JsonNode> asJson = Unirest.post("http://cloud.feedly.com/v3/markers")
-					.header("Authorization", "OAuth AxoziqwZU2mvx68PNT0ocTfbxQFEXT19D_Ydw6WGd2E5zk_QIHncf30HlA2ag03xIA6rBAfZf-rZ_u5tQxfy8PxWVwVpm1f52C4w-aNj4OcTRcMkOVjy9RsJXoyjEMT3JvbevNs4_CYDLu-YMwcBUX9pykkPrcu2Est65U7j0kNOtmgqVFoKAutrWIvaqJJRUJYYJyPLY0HJ0cojW57aZrnlzXY16Q:feedlydev")
+					.header("Authorization", "OAuth A1L-jrp3BBwfxmOj3TwYsHvcSJrP0M1bsh4Os-3hSYKrdmuU4AkUSH0fr5ObG5xCEq6OjuM_Xti-aKh1GeKr5ZCoEmfZqBljf9hM-mpf_sA-ch8NGi7i67jZ0NRICfYDB1efUT45KZeDJfmqN4NapMbB_yo6fnO3hu8A79CnYwl457xvSO9ipUppd4fhRR-gOlHDUJgFUd4dv-1D6Fe3dcbXxmQt:feedlydev")
 					.body(serializedRequest)
 					.asJson();
 			System.out.println(asJson.getStatus() + asJson.getStatusText());
@@ -192,7 +198,7 @@ public class FeedlySpeechlet implements Speechlet {
 		try {
 			session.setAttribute("itemBeingDelivered", objectMapper.writeValueAsString(itemToDeliver));
 		} catch (JsonProcessingException e) {
-			throw new SpeechletException("Couldn't serialize");
+			throw new SpeechletException("Couldn't serialize: " + itemToDeliver);
 		}
 
 		MarkersRequest request = new MarkersRequest();
@@ -206,7 +212,7 @@ public class FeedlySpeechlet implements Speechlet {
 		{
 			logger.warn("Failed to mark the item delivered as read. Not a critical failure and so swallowing the exception.");
 		}
-		session.setAttribute("reviewed", (int)session.getAttribute("reviewed") + 1);
+		session.setAttribute("reviewed", (Integer)session.getAttribute("reviewed") + 1);
 
 		String ssmlText = "<speak> ";
 		ssmlText += "From " + StringEscapeUtils.escapeXml11(itemToDeliver.getOrigin().getTitle()) + ". " + StringEscapeUtils.escapeXml11(itemToDeliver.getTitle());
@@ -232,7 +238,7 @@ public class FeedlySpeechlet implements Speechlet {
 			url += "&continuation=" + continuation;
 		}
 		GetRequest getRequest = Unirest.get(url);
-		getRequest.header("Authorization", "OAuth Ay1PAqrASp7FqRCGfZr3k8XvK_NmwPFjwbG_Gk1BQ4mOJzjbW86o1RGPzDo0Hj55_tKBZ7Xp7eu0U-FpAZpltt46h7Ec1-VKIUzYJkRbNBuSalpjOStsgseIwmo6mCmvaj1eAIqiXOHdXfcAq7GQnzTOQxThVXIfXlI00q51li1zz_nq8B09spvIEiKieIa6uiV1zX2Nr2j7oGNRAHDxRXDaS8r0NQ:feedlydev");
+		getRequest.header("Authorization", "OAuth A1L-jrp3BBwfxmOj3TwYsHvcSJrP0M1bsh4Os-3hSYKrdmuU4AkUSH0fr5ObG5xCEq6OjuM_Xti-aKh1GeKr5ZCoEmfZqBljf9hM-mpf_sA-ch8NGi7i67jZ0NRICfYDB1efUT45KZeDJfmqN4NapMbB_yo6fnO3hu8A79CnYwl457xvSO9ipUppd4fhRR-gOlHDUJgFUd4dv-1D6Fe3dcbXxmQt:feedlydev");
 
 		Unirest.setObjectMapper(ObjectMapperFactory.streamContentsObjectMapper());
 		try {
@@ -243,16 +249,16 @@ public class FeedlySpeechlet implements Speechlet {
 		}
 	}
 
-	@Override
 	public SpeechletResponse onLaunch(LaunchRequest launchRequest, Session session) throws SpeechletException {
 		logger.info("FeedlySpeechlet launched. Request: " + launchRequest + ". SessionId: " + session.getSessionId());
 
-		return handleFeedlyIntent(session);
+		SpeechletResponse response = handleFeedlyIntent(session);
+		return response;
 	}
 
 	private SpeechletResponse renderEndOfFeeds(Session session) {
-		int numberOfSavedArticles = session.getAttribute("saved") == null ? 0 : (int)session.getAttribute("saved");
-		int numberOfReviewedArticles = session.getAttribute("reviewed") == null ? 0 : (int)session.getAttribute("reviewed");
+		int numberOfSavedArticles = session.getAttribute("saved") == null ? 0 : (Integer)session.getAttribute("saved");
+		int numberOfReviewedArticles = session.getAttribute("reviewed") == null ? 0 : (Integer)session.getAttribute("reviewed");
 
 		PlainTextOutputSpeech outputSpeech = new PlainTextOutputSpeech();
 		outputSpeech.setText("There are no more unread articles. You reviewed " + numberOfReviewedArticles + " articles and saved " + numberOfSavedArticles + ". Goodbye");
@@ -264,11 +270,9 @@ public class FeedlySpeechlet implements Speechlet {
 		return SpeechletResponse.newTellResponse(outputSpeech, card);
 	}
 
-	@Override
 	public void onSessionEnded(SessionEndedRequest arg0, Session arg1) throws SpeechletException {
 	}
 
-	@Override
 	public void onSessionStarted(SessionStartedRequest arg0, Session arg1) throws SpeechletException {
 	}
 
