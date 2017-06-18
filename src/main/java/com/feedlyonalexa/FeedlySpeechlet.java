@@ -87,6 +87,102 @@ public class FeedlySpeechlet implements Speechlet {
 		throw new SpeechletException("No handler for the intent: " + intentRequest.getIntent().getName());
 	}
 
+    public SpeechletResponse onLaunch(LaunchRequest launchRequest, Session session) throws SpeechletException {
+        logger.info("FeedlySpeechlet launched. Request: " + launchRequest + ". SessionId: " + session.getSessionId());
+
+        SpeechletResponse response = handleFeedlyIntent(session);
+        return response;
+    }
+
+    public void onSessionEnded(SessionEndedRequest arg0, Session arg1) throws SpeechletException {
+    }
+
+    public void onSessionStarted(SessionStartedRequest arg0, Session arg1) throws SpeechletException {
+    }
+
+    private SpeechletResponse handleFeedlyIntent(Session session) throws SpeechletException {
+        String continuation = (session.getAttribute("continuation") == null) ? null : (String)session.getAttribute("continuation");
+        if(!session.isNew() && StringUtils.isEmpty(continuation))
+        {
+            return renderEndOfFeeds(session);
+        }
+
+        if(session.isNew())
+        {
+            session.setAttribute("reviewed", 0);
+            session.setAttribute("saved", 0);
+        }
+
+        StreamContents streamContents = getStreamContents(continuation);
+        if(streamContents == null)
+        {
+            throw new SpeechletException("Unexpected error. StreamContent was null.");
+        }
+        List<Item> items = streamContents.getItems();
+        if(null == items || items.size() == 0)
+        {
+            return renderEndOfFeeds(session);
+        }
+
+        Item itemToDeliver = items.get(0);
+        session.setAttribute("continuation", streamContents.getContinuation());
+        try {
+            session.setAttribute("itemBeingDelivered", objectMapper.writeValueAsString(itemToDeliver));
+        } catch (JsonProcessingException e) {
+            throw new SpeechletException("Couldn't serialize: " + itemToDeliver);
+        }
+
+        MarkersRequest request = new MarkersRequest();
+        List<String> entryIds = new ArrayList<String>();
+        entryIds.add(itemToDeliver.getId());
+        request.setEntryIds(entryIds);
+        request.setAction(MarkersAction.markAsRead);
+        try {
+            callMarkers(request);
+        } catch(Exception e)
+        {
+            logger.warn("Failed to mark the item delivered as read. Not a critical failure and so swallowing the exception.");
+        }
+        session.setAttribute("reviewed", (Integer)session.getAttribute("reviewed") + 1);
+
+        String ssmlText = "<speak> ";
+        ssmlText += "From " + StringEscapeUtils.escapeXml11(itemToDeliver.getOrigin().getTitle()) + ". " + StringEscapeUtils.escapeXml11(itemToDeliver.getTitle());
+        ssmlText += " </speak>";
+
+        SsmlOutputSpeech outputSpeech = new SsmlOutputSpeech();
+        outputSpeech.setSsml(ssmlText);
+
+        Reprompt reprompt = new Reprompt();
+        PlainTextOutputSpeech repromptSpeech = new PlainTextOutputSpeech();
+        repromptSpeech.setText("Do you want me to add this to your saved articles? As I wait after each article, you can say things like Save, Yes, Add it et cetera. " +
+                "Otherwise, say things like 'Skip', 'No', 'Do not save it' et cetera.");
+        reprompt.setOutputSpeech(repromptSpeech);
+
+        return SpeechletResponse.newAskResponse(outputSpeech, reprompt);
+    }
+
+    private SpeechletResponse handleYesIntent(IntentRequest intentRequest, Session session) throws SpeechletException {
+        String itemAsString = (String)session.getAttribute("itemBeingDelivered");
+        Item item;
+        try {
+            item = objectMapper.readValue(itemAsString, Item.class);
+        } catch (Exception e) {
+            throw new SpeechletException("Unable to deserialize items: " + itemAsString, e);
+        }
+
+        MarkersRequest request = new MarkersRequest();
+        List<String> entryIds = new ArrayList<String>();
+        entryIds.add(item.getId());
+        request.setEntryIds(entryIds);
+        request.setAction(MarkersAction.markAsSaved);
+        callMarkers(request);
+
+        int numberOfSavedArticles = session.getAttribute("saved") == null ? 0 : (Integer)session.getAttribute("saved");
+        session.setAttribute("saved", ++numberOfSavedArticles);
+
+        return handleFeedlyIntent(session);
+    }
+
 	private SpeechletResponse handleStopIntent(Session session) throws SpeechletException {
 		PlainTextOutputSpeech outputSpeech = new PlainTextOutputSpeech();
 		outputSpeech.setText(Prompts.END_SESSION_PROMPT);
@@ -99,28 +195,6 @@ public class FeedlySpeechlet implements Speechlet {
 		card.setContent(CardMessages.buildSummaryMessage(numberOfArticlesSaved, numberOfArticlesReviewed));
 
 		return SpeechletResponse.newTellResponse(outputSpeech, card);
-	}
-
-	private SpeechletResponse handleYesIntent(IntentRequest intentRequest, Session session) throws SpeechletException {
-		String itemAsString = (String)session.getAttribute("itemBeingDelivered");
-		Item item;
-		try {
-			item = objectMapper.readValue(itemAsString, Item.class);
-		} catch (Exception e) {
-			throw new SpeechletException("Unable to deserialize items: " + itemAsString, e);
-		}
-
-		MarkersRequest request = new MarkersRequest();
-		List<String> entryIds = new ArrayList<String>();
-		entryIds.add(item.getId());
-		request.setEntryIds(entryIds);
-		request.setAction(MarkersAction.markAsSaved);
-		callMarkers(request);
-
-		int numberOfSavedArticles = session.getAttribute("saved") == null ? 0 : (Integer)session.getAttribute("saved");
-		session.setAttribute("saved", ++numberOfSavedArticles);
-
-		return handleFeedlyIntent(session);
 	}
 
 	private SpeechletResponse handleRepeatIntent(IntentRequest intentRequest, Session session) throws SpeechletException {
@@ -169,67 +243,6 @@ public class FeedlySpeechlet implements Speechlet {
 		}
 	}
 
-	private SpeechletResponse handleFeedlyIntent(Session session) throws SpeechletException {
-		String continuation = (session.getAttribute("continuation") == null) ? null : (String)session.getAttribute("continuation");
-		if(!session.isNew() && StringUtils.isEmpty(continuation))
-		{
-			return renderEndOfFeeds(session);
-		}
-
-		if(session.isNew())
-		{
-			session.setAttribute("reviewed", 0);
-			session.setAttribute("saved", 0);
-		}
-
-		StreamContents streamContents = getStreamContents(continuation);
-		if(streamContents == null)
-		{
-			throw new SpeechletException("Unexpected error. StreamContent was null.");
-		}
-		List<Item> items = streamContents.getItems();
-		if(null == items || items.size() == 0)
-		{
-			return renderEndOfFeeds(session);
-		}
-
-		Item itemToDeliver = items.get(0);
-		session.setAttribute("continuation", streamContents.getContinuation());
-		try {
-			session.setAttribute("itemBeingDelivered", objectMapper.writeValueAsString(itemToDeliver));
-		} catch (JsonProcessingException e) {
-			throw new SpeechletException("Couldn't serialize: " + itemToDeliver);
-		}
-
-		MarkersRequest request = new MarkersRequest();
-		List<String> entryIds = new ArrayList<String>();
-		entryIds.add(itemToDeliver.getId());
-		request.setEntryIds(entryIds);
-		request.setAction(MarkersAction.markAsRead);
-		try {
-			callMarkers(request);
-		} catch(Exception e)
-		{
-			logger.warn("Failed to mark the item delivered as read. Not a critical failure and so swallowing the exception.");
-		}
-		session.setAttribute("reviewed", (Integer)session.getAttribute("reviewed") + 1);
-
-		String ssmlText = "<speak> ";
-		ssmlText += "From " + StringEscapeUtils.escapeXml11(itemToDeliver.getOrigin().getTitle()) + ". " + StringEscapeUtils.escapeXml11(itemToDeliver.getTitle());
-		ssmlText += " </speak>";
-
-		SsmlOutputSpeech outputSpeech = new SsmlOutputSpeech();
-		outputSpeech.setSsml(ssmlText);
-
-		Reprompt reprompt = new Reprompt();
-		PlainTextOutputSpeech repromptSpeech = new PlainTextOutputSpeech();
-		repromptSpeech.setText("Do you want me to add this to your saved articles? As I wait after each article, you can say things like Save, Yes, Add it et cetera. " +
-				"Otherwise, say things like 'Skip', 'No', 'Do not save it' et cetera.");
-		reprompt.setOutputSpeech(repromptSpeech);
-
-		return SpeechletResponse.newAskResponse(outputSpeech, reprompt);
-	}
-
 	private StreamContents getStreamContents(String continuation) throws SpeechletException
 	{
 		String url = "http://cloud.feedly.com/v3/streams/contents?streamId=user/acce4bfe-7fe1-4c5c-9598-24d8e910fa43/category/global.all&count=1&unreadOnly=true";
@@ -249,13 +262,6 @@ public class FeedlySpeechlet implements Speechlet {
 		}
 	}
 
-	public SpeechletResponse onLaunch(LaunchRequest launchRequest, Session session) throws SpeechletException {
-		logger.info("FeedlySpeechlet launched. Request: " + launchRequest + ". SessionId: " + session.getSessionId());
-
-		SpeechletResponse response = handleFeedlyIntent(session);
-		return response;
-	}
-
 	private SpeechletResponse renderEndOfFeeds(Session session) {
 		int numberOfSavedArticles = session.getAttribute("saved") == null ? 0 : (Integer)session.getAttribute("saved");
 		int numberOfReviewedArticles = session.getAttribute("reviewed") == null ? 0 : (Integer)session.getAttribute("reviewed");
@@ -268,12 +274,6 @@ public class FeedlySpeechlet implements Speechlet {
 		card.setContent("You reviewed " + numberOfReviewedArticles + " articles and saved " + numberOfSavedArticles);
 
 		return SpeechletResponse.newTellResponse(outputSpeech, card);
-	}
-
-	public void onSessionEnded(SessionEndedRequest arg0, Session arg1) throws SpeechletException {
-	}
-
-	public void onSessionStarted(SessionStartedRequest arg0, Session arg1) throws SpeechletException {
 	}
 
 	private static final ObjectMapper objectMapper = ObjectMapperFactory.getInstance();
