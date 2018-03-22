@@ -130,6 +130,6 @@ public class FeedlySpeechletTest
 
 	private static final FeedlySpeechlet speechlet = new FeedlySpeechlet();
 
-    public static final String REQUEST_ID = "requestId";
-    public static final String SESSION_ID = "sessionId";
+    private static final String REQUEST_ID = "requestId";
+    private static final String SESSION_ID = "sessionId";
 }
